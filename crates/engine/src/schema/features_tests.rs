@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use super::{BoxParams, ExtrudeParams, FeatureResult};
+use super::{BoundingSolidParams, BoxParams, CylinderParams, ExtrudeParams, FeatureResult, PipeParams, ScaleParams, SphereParams, TorusParams};
 use crate::Session;
 use crate::schema::tests::{assert_keys, assert_strict_keeps_todays_errors, conforms, sketch_rectangle};
 use crate::schema::{ParamCheck, input_schema_for, output_schema_for};
@@ -45,6 +45,24 @@ fn schemas_and_the_key_check_agree() {
             "to_offset",
         ],
     );
+    assert_keys(
+        input_schema_for::<CylinderParams>(),
+        &["axis", "base", "body_name", "body_names", "diameter", "height", "name", "operation", "participants", "radius", "targets"],
+    );
+    assert_keys(
+        input_schema_for::<SphereParams>(),
+        &["body_name", "body_names", "center", "diameter", "name", "operation", "participants", "radius", "targets"],
+    );
+    assert_keys(
+        input_schema_for::<TorusParams>(),
+        &["body_name", "body_names", "center", "major", "minor", "name", "operation", "participants", "targets"],
+    );
+    assert_keys(
+        input_schema_for::<PipeParams>(),
+        &["body_name", "body_names", "diameter", "name", "operation", "participants", "path", "path_sketch", "targets", "wall"],
+    );
+    assert_keys(input_schema_for::<BoundingSolidParams>(), &["bodies", "body_name", "body_names", "margin", "name", "participants"]);
+    assert_keys(input_schema_for::<ScaleParams>(), &["bodies", "factor", "factors", "name", "origin", "participants"]);
 }
 
 #[test]
@@ -72,6 +90,24 @@ fn strict_keeps_todays_errors() {
         ("solid.extrude", json!({"distance": 5, "convention": "per_side"})),
         ("solid.extrude", json!({"distance": "  "})),
         ("solid.extrude", json!({"distance": 5, "operation": "x".repeat(1000)})),
+        ("solid.cylinder", json!({"radius": 5, "height": 5, "axis": "W"})),
+        ("solid.cylinder", json!({"radius": 5, "height": 5, "axis": " w "})),
+        ("solid.cylinder", json!({"radius": 5, "height": 5, "axis": [0, 0, 0]})),
+        ("solid.cylinder", json!({"radius": 5, "height": 5, "axis": null})),
+        ("solid.cylinder", json!({"radius": 5, "height": 5, "base": [1, 2]})),
+        ("solid.cylinder", json!({"radius": 5, "height": 5, "operation": "bogus"})),
+        ("solid.cylinder", json!({"radius": 5, "height": true})),
+        ("solid.sphere", json!({"radius": 5, "center": "x"})),
+        ("solid.sphere", json!({"radius": 5, "center": null})),
+        ("solid.sphere", json!({"radius": 5, "operation": "bogus"})),
+        ("solid.torus", json!({"major": 5, "minor": 1, "center": {"x": 1, "y": 2}})),
+        ("solid.torus", json!({"major": true, "minor": 1})),
+        ("solid.torus", json!({"major": 5, "minor": 1, "operation": "bogus"})),
+        ("solid.pipe", json!({"path_sketch": true, "path": ["l1"], "diameter": 2})),
+        ("solid.pipe", json!({"path_sketch": null, "path": ["l1"], "diameter": 2})),
+        ("solid.scale", json!({"bodies": ["Body1"], "factors": [1, 2]})),
+        ("solid.scale", json!({"bodies": ["Body1"], "factors": [1, 2, 3, 4]})),
+        ("solid.scale", json!({"bodies": ["Body1"]})),
     ]);
 }
 
@@ -125,4 +161,75 @@ fn replies_match_the_output_schema() {
     let mut bad = ok.clone();
     bad.as_object_mut().map(|o| o.remove("name"));
     assert!(!conforms(schema, schema, &bad), "{bad}");
+}
+
+/// The feature commands converted after box and extrude answer with `FeatureResult` too, and
+/// their contracts take every form these calls use: in Warn, a contract that refused one would
+/// still run the command, so the replies are checked for warnings too.
+#[test]
+fn converted_primitives_and_body_commands_reply_with_feature_result() {
+    let schema = output_schema_for::<FeatureResult>();
+    let schema = schema.as_value();
+    let mut s = Session { param_check: ParamCheck::Warn, ..Session::default() };
+    let mut run = |id: &str, p: Value| s.execute(id, &p).unwrap_or_else(|e| panic!("{id}: {e}"));
+    let mut replies = vec![
+        run(
+            "solid.cylinder",
+            json!({"radius": 2, "diameter": 9, "height": 5, "base": [20, "0 mm", 0], "axis": " x ", "name": "Cyl", "body_name": "Cyl"}),
+        ),
+        run("solid.cylinder", json!({"diameter": 2, "height": 3, "base": [0, -20, 0], "axis": [0, 1, 0], "operation": "new body"})),
+        run(
+            "solid.cylinder",
+            json!({"radius": 1, "height": 3, "base": {"x": 0, "y": -30, "z": 0}, "axis": {"x": 0, "y": 0, "z": 1}, "body_names": ["Peg"]}),
+        ),
+        run("solid.sphere", json!({"diameter": 4, "center": {"x": 0, "y": 20, "z": 0}})),
+        run("solid.sphere", json!({"radius": 1, "center": [22, 0, 2], "operation": "union", "targets": ["Peg"], "participants": []})),
+        run("solid.sphere", json!({"radius": 1, "center": [23, 0, -2], "operation": "join", "targets": ["Peg"], "participants": ["Cyl"]})),
+        run("solid.torus", json!({"major": 5, "minor": 1, "center": [0, 0, "20 mm"], "participants": ["Peg"]})),
+        run("solid.bounding_solid", json!({"bodies": ["Cyl"], "margin": 1})),
+        run("solid.bounding_solid", json!({})),
+        run("solid.bounding_solid", json!({"bodies": "Peg", "body_name": "PegBox"})),
+        run("solid.scale", json!({"bodies": ["Cyl"], "factors": [1, 2, "1.5"], "origin": [20, 0, 0]})),
+        run("solid.scale", json!({"bodies": "Cyl", "factors": [1, 1, 2], "factor": 3})),
+        run(
+            "solid.scale",
+            json!({"bodies": "Peg", "factor": "3 / 2", "origin": {"x": 0, "y": -30, "z": 0}, "name": "Grow", "participants": ["Cyl"]}),
+        ),
+    ];
+    let sketch = run("sketch.create", json!({"plane": "XZ", "name": "Path"}));
+    let line = run("sketch.line", json!({"points": [[40, 0], [40, 30]]}));
+    let across = run("sketch.line", json!({"points": [[22, -8], [22, 8]]}));
+    run("sketch.finish", json!({}));
+    let id = sketch["sketch"].clone();
+    assert!(id.is_u64(), "{sketch}");
+    replies.push(run("solid.pipe", json!({"path_sketch": "Path", "path": line["curves"].clone(), "diameter": 4, "wall": 1, "body_name": "Tube"})));
+    replies.push(run(
+        "solid.pipe",
+        json!({"path_sketch": id, "path": across["curves"][0].clone(), "diameter": 1, "operation": "join", "targets": ["Cyl"]}),
+    ));
+    // Warn reports what the contract refuses and runs the command anyway.
+    let typo = run("solid.scale", json!({"bodies": "Cyl", "factor": 2, "colour": "red"}));
+    assert_eq!(typo["param_warnings"], json!(["unknown key `colour`"]));
+    // A scale makes no body, so its contract doesn't take the new body's name.
+    let no_body = run("solid.scale", json!({"bodies": "Cyl", "factor": 1, "body_name": "Big"}));
+    let warning = no_body["param_warnings"][0].as_str().unwrap_or_default();
+    assert!(warning.starts_with("unknown key `body_name`"), "{no_body}");
+    for r in replies.iter().chain([&typo, &no_body]) {
+        assert!(conforms(schema, schema, r), "{r} doesn't match {schema}");
+    }
+    for r in &replies {
+        assert!(r.get("param_warnings").is_none(), "{r}");
+    }
+    // A primitive's `targets` count when `participants` lists no bodies (the sphere meets only
+    // `Cyl` but joins `Peg`) and not when it does; a scale's `participants` don't change which
+    // bodies it scales.
+    let changed = [4, 5, 12].map(|i| replies[i]["changed_bodies"].clone());
+    assert_eq!(changed, [json!(["Peg"]), json!(["Cyl"]), json!(["Peg"])]);
+    // With `factors` given, `factor` has no effect but must still evaluate.
+    assert!(s.execute("solid.scale", &json!({"bodies": "Cyl", "factors": [1, 1, 2], "factor": "no_such_parameter"})).is_err());
+    // Without `targets`, a primitive works on every body in the component: an intersect removes
+    // the bodies it doesn't meet.
+    let r = s.execute("solid.sphere", &json!({"radius": 1, "center": [22, 0, 0], "operation": "intersect"})).unwrap_or_else(|e| panic!("{e}"));
+    let (changed, removed) = (r["changed_bodies"].as_array().cloned(), r["removed_bodies"].as_array().cloned());
+    assert!(changed.is_some_and(|c| c.contains(&json!("Bounding"))) && removed.is_some_and(|r| r.contains(&json!("Peg"))), "{r}");
 }
