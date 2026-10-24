@@ -39,10 +39,16 @@ handler and everything it passes `p` to:
 - direct reads: `p.get("k")`, `params::expr(p, "k")`, `req_expr`, `str_`, `num`, `bool_`, `vec3`,
   `string_list` and the like;
 - `features::add_feature` (every feature command) reads `name`, `body_name`, `body_names` and
-  `participants`: take them with [`FeatureCommon`](#shared-types). For the primitives (box,
-  cylinder, sphere, torus) it also reads `targets`; a new primitive must join the `primitive`
-  match in `add_feature_in`, and its contract declares `targets`. The commands that combine
-  bodies read `operation` (and usually `targets`) in their own handlers;
+  `participants`: take them with [`FeatureCommon`](#shared-types). What `participants` changes
+  depends on the feature, and for some it changes nothing in the result: check where the
+  feature is evaluated (`crates/doc/src/eval.rs`). `participants` takes its description from
+  `FeatureCommon`, shared by every feature, so say what it does for this one elsewhere: where it
+  and another key override each other (a primitive's `targets` gives way to it; an extrude's
+  `targets` overrides it), in that key's description; where it has no effect, in the summary.
+  For the primitives (box, cylinder, sphere, torus) `add_feature` also reads `targets`; a new
+  primitive must join the `primitive` match in `add_feature_in`, and its contract declares
+  `targets`. The commands that combine bodies read `operation` (and usually `targets`) in their
+  own handlers;
 - keys read around the command: `frames::to_local` reads `body` (and `face_body`) for commands
   that take picks;
 - `live`, for a command with `.live(…)` (today `sketch.drag` and `sketch.edit_text`): a call
@@ -98,7 +104,9 @@ pub struct WedgeParams {
     /// How the wedge combines with existing bodies. Default: new.
     #[serde(default)]
     pub operation: Option<OperationParam>,
-    /// The bodies a join, cut or intersect works on. Default: the bodies the wedge meets.
+    /// The bodies a join, cut or intersect works on. Default: every body in the feature's
+    /// component, not its sub-components (an intersect removes those the wedge doesn't meet).
+    /// Ignored when `participants` lists bodies.
     #[serde(default)]
     pub targets: Option<StringList>,
     #[serde(flatten, deserialize_with = "feature_common")]
@@ -109,7 +117,10 @@ pub struct WedgeParams {
 - **Descriptions are the documentation.** The struct's doc comment is the command's summary and
   each field's doc comment is its description in the schema, so put nothing else on those
   lines. Say the unit or form, the default (`Default: …`) and when the key is ignored. Write for
-  someone who has only the schema.
+  someone who has only the schema. Check what each value does where the feature is evaluated
+  (`crates/doc/src/eval.rs` and the kernel), not only how the handler reads it: a limit the
+  evaluation enforces (a torus's `minor` must be less than its `major`) or a key it ignores
+  belongs in the description.
 - **Required or optional** follows the handler: a key it can't do without is a plain field;
   any other is `#[serde(default)] Option<T>`.
 - **`null`:** the common readers (`str_`, `num`, `bool_`, `expr`, `string_list`) read `null` as
@@ -188,7 +199,13 @@ In the module's tests file:
   purpose, such as a missing required key (strict says `` `length` is required ``, the handler
   something else).
 - **A reply test:** run the command and check the reply matches its output schema with
-  `conforms` (see `replies_match_the_output_schema` in `schema/features_tests.rs`).
+  `conforms` (`replies_match_the_output_schema` in `schema/features_tests.rs` shows how; its
+  misspelt-key call checks that a reply carrying warnings still matches). Run every form the
+  command takes (each alternative key, such as `corner` or `center`, each `operation`, one name
+  and a list of names) in Warn, and check those replies have no `param_warnings`: Warn runs a
+  call the contract refuses anyway, so a matching reply doesn't show the contract accepts the
+  call. A reply that isn't an object never carries `param_warnings`; run those calls in Strict,
+  where a refused call is an error.
 
 `schema_defaults_are_valid` checks the `default` of each top-level parameter on its own; a
 nested type's defaults are yours to check.
