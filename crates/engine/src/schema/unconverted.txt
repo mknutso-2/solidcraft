@@ -7,6 +7,8 @@ appearance.library
 appearance.list
 assembly.bom
 body.rename
+browser.collapse_all
+browser.expand_all
 browser.group
 browser.move
 browser.order
@@ -125,6 +127,7 @@ inspect.interference
 inspect.isocurve
 inspect.measure
 inspect.minimum_radius
+inspect.parameter_sweep
 inspect.section
 inspect.silhouette
 inspect.zebra
@@ -254,6 +257,7 @@ sheet.flat_pattern
 sheet.fold
 sheet.hem
 sheet.manage_rules
+sheet.path_flange
 sheet.perforate
 sheet.refold
 sheet.rules
@@ -439,12 +443,19 @@ timeline.suppress
 timeline.ungroup
 view.ambient_occlusion
 view.apply
+view.back
+view.bottom
 view.delete
+view.front
 view.graphics_preset
 view.history_layout
+view.isometric
 view.layout
+view.left
 view.list
 view.navigate
 view.normal_to
 view.rename
+view.right
 view.save
+view.top
