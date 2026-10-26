@@ -13,7 +13,10 @@ command's exact parameters instead of guessing from prose.
 
 ## When the check fails
 
-The tests in `crates/engine/src/schema/coverage_tests.rs` say what to do:
+The tests in `crates/engine/src/schema/coverage_tests.rs` say what to do. A command without
+schemas is only a warning for now (the test prints the list); it will become required once the
+PR backlog is down, so give new commands both schemas now. Set `SOLIDCRAFT_SCHEMA_RULE_STRICT=1`
+to make the missing-schema check fail today.
 
 - **"`x.y` has no input or output schema"** (or "no input schema", "no output schema"): a new
   command. Give it what it lacks, as below. Don't add it to `schema/unconverted.txt`: that list

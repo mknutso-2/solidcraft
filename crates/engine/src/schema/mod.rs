@@ -37,8 +37,8 @@
 //! `record.rs`): a call that succeeds today but breaks the contract is either a form the
 //! contract is missing or a caller's mistake.
 //!
-//! New commands come with both schemas: `coverage_tests.rs` fails for a command without a
-//! contract or an output type, unless it is a `planned!` placeholder or listed in
+//! New commands come with both schemas: `coverage_tests.rs` warns about a command without a
+//! contract or an output type (it will fail once `SCHEMA_RULE_STRICT` flips), unless it is a `planned!` placeholder or listed in
 //! `unconverted.txt`, which holds the commands that predate the rule. That list only shrinks:
 //! converting a command removes its line, and nothing is added to it. How to write a contract,
 //! with the shared types and a checklist: docs/book/src/dev/schemas.md.

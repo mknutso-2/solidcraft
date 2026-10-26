@@ -131,8 +131,8 @@ The [architecture page](docs/architecture.md) has the layer table. The short ver
    - Every crash fix comes with a regression test.
 5. **Everything is a command, with a test.** A new feature means a `CommandSpec` in
    `crates/engine/src/cmd/` with input and output schemas (see
-   [Adding a command](docs/book/src/dev/commands.md#adding-a-command); a test checks every
-   command has them), engine tests that measure the result (volume, area,
+   [Adding a command](docs/book/src/dev/commands.md#adding-a-command); a test warns about a
+   command without them, and will fail it once required), engine tests that measure the result (volume, area,
    face/edge/vertex counts against a value you can derive), and for UI work a scenario (below).
 6. **One set of camera controls.** Every page or canvas that shows a view (the modelling
    viewport, the Render preview, and any new page such as a flat pattern or drawing) calls
