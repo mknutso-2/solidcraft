@@ -251,6 +251,49 @@ pub struct TorusParams {
     pub common: FeatureCommon,
 }
 
+/// Add a cone or truncated cone: the base circle and, `height` along `axis`, the top circle (a
+/// point when its radius is 1e-6 mm or less). Its radii, height and base are within 1e7 mm.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct ConeParams {
+    /// The base circle's radius, above 1e-6 mm. Give it or `diameter`; when both are given,
+    /// `radius` is used.
+    #[serde(default)]
+    pub radius: Option<LengthExpr>,
+    /// The base circle's diameter, instead of `radius`.
+    #[serde(default)]
+    pub diameter: Option<LengthExpr>,
+    /// The top circle's radius, 0 or more; up to 1e-6 mm makes a full cone ending in a point.
+    /// When both are given, `top_radius` is used. Default: 0.
+    #[serde(default)]
+    pub top_radius: Option<LengthExpr>,
+    /// The top circle's diameter, instead of `top_radius`.
+    #[serde(default)]
+    pub top_diameter: Option<LengthExpr>,
+    /// The top's distance from the base along `axis`, more than 1e-6 mm either way; a negative
+    /// height goes the other way.
+    pub height: LengthExpr,
+    /// The centre of the base circle. Default: the origin.
+    #[serde(default, deserialize_with = "present", skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "PointExpr3")]
+    pub base: Option<PointExpr3>,
+    /// The direction `height` is measured along: from the base towards the top when `height` is
+    /// positive. Default: Z.
+    #[serde(default, deserialize_with = "present", skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "AxisDir")]
+    pub axis: Option<AxisDir>,
+    /// How the cone combines with existing bodies. Default: new.
+    #[serde(default)]
+    pub operation: Option<OperationParam>,
+    /// The bodies a join, cut or intersect works on. Default: every body in the active
+    /// component (an intersect removes those the cone doesn't meet).
+    /// Ignored when `participants` lists bodies.
+    #[serde(default)]
+    pub targets: Option<StringList>,
+    #[serde(flatten, deserialize_with = "feature_common")]
+    pub common: FeatureCommon,
+}
+
 /// Add a solid tube along a path of sketch curves.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[schemars(deny_unknown_fields)]

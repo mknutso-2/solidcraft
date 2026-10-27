@@ -12,7 +12,7 @@ use solidcraft_geom::Vec3;
 use super::{CommandSpec, not_in_sketch};
 use crate::params::{bad, bool_, expr, expr_problem, req_expr, str_, string_list, vec2, vec3};
 use crate::schema::features::{
-    BoundingSolidParams, BoxParams, CylinderParams, ExtrudeParams, FeatureResult, PipeParams, ScaleParams, SphereParams, TorusParams,
+    BoundingSolidParams, BoxParams, ConeParams, CylinderParams, ExtrudeParams, FeatureResult, PipeParams, ScaleParams, SphereParams, TorusParams,
 };
 use crate::schema::{TypedContract, output_schema_for};
 use crate::{EngineError, Result, Session};
@@ -22,6 +22,7 @@ const EXTRUDE_CONTRACT: TypedContract<ExtrudeParams> = TypedContract::new();
 const CYLINDER_CONTRACT: TypedContract<CylinderParams> = TypedContract::new();
 const SPHERE_CONTRACT: TypedContract<SphereParams> = TypedContract::new();
 const TORUS_CONTRACT: TypedContract<TorusParams> = TypedContract::new();
+const CONE_CONTRACT: TypedContract<ConeParams> = TypedContract::new();
 const PIPE_CONTRACT: TypedContract<PipeParams> = TypedContract::new();
 const BOUNDING_SOLID_CONTRACT: TypedContract<BoundingSolidParams> = TypedContract::new();
 const SCALE_CONTRACT: TypedContract<ScaleParams> = TypedContract::new();
@@ -67,7 +68,12 @@ pub static COMMANDS: &[CommandSpec] = &[
         .contract(&TORUS_CONTRACT)
         .output(output_schema_for::<FeatureResult>)
         .params("major, minor: expr (radii); center?: [x,y,z] (numbers in mm or length expressions; default: the origin); operation?, targets?: [body], name?, body_name?"),
-    CommandSpec::new("solid.cone", "Cone", prim_cone).at("SOLID", "CREATE").icon("cone").params("radius | diameter, height: expr (the base circle, and the top's distance along the axis; a negative height goes the other way); top_radius? | top_diameter?: expr (the top circle; default 0: a full cone ending in an apex); base?: [x,y,z] (centre of the base circle: numbers in mm or length expressions; default: the origin); axis?: X|Y|Z|[x,y,z] (default Z); operation?, targets?: [body], name?, body_name?"),
+    CommandSpec::new("solid.cone", "Cone", crate::checked!("solid.cone", prim_cone))
+        .at("SOLID", "CREATE")
+        .icon("cone")
+        .contract(&CONE_CONTRACT)
+        .output(output_schema_for::<FeatureResult>)
+        .params("radius | diameter, height: expr (the base circle, and the top's distance along the axis; a negative height goes the other way); top_radius? | top_diameter?: expr (the top circle; default 0: a full cone ending in an apex); base?: [x,y,z] (centre of the base circle: numbers in mm or length expressions; default: the origin); axis?: X|Y|Z|[x,y,z] (default Z); operation?, targets?: [body], name?, body_name?"),
     CommandSpec::new("solid.fillet", "Fillet", fillet)
         .at("SOLID", "MODIFY")
         .icon("fillet")

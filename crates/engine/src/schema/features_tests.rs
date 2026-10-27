@@ -1,6 +1,8 @@
 use serde_json::{Value, json};
 
-use super::{BoundingSolidParams, BoxParams, CylinderParams, ExtrudeParams, FeatureResult, PipeParams, ScaleParams, SphereParams, TorusParams};
+use super::{
+    BoundingSolidParams, BoxParams, ConeParams, CylinderParams, ExtrudeParams, FeatureResult, PipeParams, ScaleParams, SphereParams, TorusParams,
+};
 use crate::Session;
 use crate::schema::tests::{assert_keys, assert_strict_keeps_todays_errors, conforms, sketch_rectangle};
 use crate::schema::{ParamCheck, input_schema_for, output_schema_for};
@@ -58,6 +60,24 @@ fn schemas_and_the_key_check_agree() {
         &["body_name", "body_names", "center", "major", "minor", "name", "operation", "participants", "targets"],
     );
     assert_keys(
+        input_schema_for::<ConeParams>(),
+        &[
+            "axis",
+            "base",
+            "body_name",
+            "body_names",
+            "diameter",
+            "height",
+            "name",
+            "operation",
+            "participants",
+            "radius",
+            "targets",
+            "top_diameter",
+            "top_radius",
+        ],
+    );
+    assert_keys(
         input_schema_for::<PipeParams>(),
         &["body_name", "body_names", "diameter", "name", "operation", "participants", "path", "path_sketch", "targets", "wall"],
     );
@@ -103,6 +123,13 @@ fn strict_keeps_todays_errors() {
         ("solid.torus", json!({"major": 5, "minor": 1, "center": {"x": 1, "y": 2}})),
         ("solid.torus", json!({"major": true, "minor": 1})),
         ("solid.torus", json!({"major": 5, "minor": 1, "operation": "bogus"})),
+        ("solid.cone", json!({"radius": 5, "height": 5, "axis": "W"})),
+        ("solid.cone", json!({"radius": 5, "height": 5, "axis": null})),
+        ("solid.cone", json!({"radius": 5, "height": 5, "base": [1, 2]})),
+        ("solid.cone", json!({"radius": 5, "height": true})),
+        ("solid.cone", json!({"radius": 5, "height": 5, "operation": "bogus"})),
+        // A `null` top radius alone is the handler's to refuse, with its message.
+        ("solid.cone", json!({"radius": 5, "height": 5, "top_radius": null})),
         ("solid.pipe", json!({"path_sketch": true, "path": ["l1"], "diameter": 2})),
         ("solid.pipe", json!({"path_sketch": null, "path": ["l1"], "diameter": 2})),
         ("solid.scale", json!({"bodies": ["Body1"], "factors": [1, 2]})),
@@ -207,6 +234,24 @@ fn converted_primitives_and_body_commands_reply_with_feature_result() {
         "solid.pipe",
         json!({"path_sketch": id, "path": across["curves"][0].clone(), "diameter": 1, "operation": "join", "targets": ["Cyl"]}),
     ));
+    replies.push(run("solid.cone", json!({"radius": 3, "height": 6, "base": [60, 0, 0]})));
+    replies.push(run(
+        "solid.cone",
+        json!({"diameter": 6, "top_diameter": 2, "height": "-4 mm", "base": {"x": 70, "y": 0, "z": 0}, "axis": " x ", "name": "Frustum", "body_name": "Frustum"}),
+    ));
+    replies.push(run(
+        "solid.cone",
+        json!({"radius": 2, "diameter": 9, "top_radius": 1, "top_diameter": 7, "height": 5, "base": [80, "0 mm", 0], "axis": [0, 1, 0]}),
+    ));
+    replies.push(run(
+        "solid.cone",
+        json!({"radius": 2, "top_radius": null, "top_diameter": 2, "height": 3, "base": [90, 0, 0], "axis": {"x": 0, "y": 0, "z": 1}, "operation": "new body", "body_names": ["Can"]}),
+    ));
+    // The cone meets only `Frustum` but joins its target, `Can`, as the sphere above does.
+    let cone_union =
+        run("solid.cone", json!({"radius": 1, "height": 2, "base": [69, 0, 0], "operation": "union", "targets": ["Can"], "participants": []}));
+    assert_eq!(cone_union["changed_bodies"], json!(["Can"]), "{cone_union}");
+    replies.push(cone_union);
     // Warn reports what the contract refuses and runs the command anyway.
     let typo = run("solid.scale", json!({"bodies": "Cyl", "factor": 2, "colour": "red"}));
     assert_eq!(typo["param_warnings"], json!(["unknown key `colour`"]));
